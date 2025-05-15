@@ -20,8 +20,11 @@ LOG_PREFIXES = {
     "accuracy_error": "api_config_accuracy_error",
     "timeout": "api_config_timeout",
     "crash": "api_config_crash",
+    "log": "log"
 }
 
+# get suffix by prefix
+get_suffix_func = lambda prefix: "log" if prefix == LOG_PREFIXES['log'] else "txt"
 is_engineV2 = False
 
 
@@ -55,11 +58,11 @@ def get_log_file(log_type: str):
     if not is_engineV2:
         cfg = get_cfg()
         if cfg:
-            return TEST_LOG_PATH / f"{prefix + cfg.id}.txt"
+            return TEST_LOG_PATH / f"{prefix + cfg.id}.{get_suffix_func(prefix)}"
         else:
-            return TEST_LOG_PATH / f"{prefix}.txt"
+            return TEST_LOG_PATH / f"{prefix}.{get_suffix_func(prefix)}"
     pid = os.getpid()
-    return TMP_LOG_PATH / f"{prefix}_{pid}.txt"
+    return TMP_LOG_PATH / f"{prefix}_{pid}.{get_suffix_func(prefix)}"
 
 
 def write_to_log(log_type, line):
@@ -82,10 +85,11 @@ def read_log(log_type):
     if log_type not in LOG_PREFIXES:
         raise ValueError(f"Invalid log type: {log_type}")
     cfg = get_cfg()
+    prefix = LOG_PREFIXES.get(log_type)
     if cfg:
-        file_path = TEST_LOG_PATH / f"{LOG_PREFIXES[log_type] + cfg.id}.txt"
+        file_path = TEST_LOG_PATH / f"{prefix + cfg.id}.{get_suffix_func(prefix)}"
     else:
-        file_path = TEST_LOG_PATH / f"{LOG_PREFIXES[log_type]}.txt"
+        file_path = TEST_LOG_PATH / f"{prefix}.{get_suffix_func(prefix)}"
     try:
         with file_path.open("r") as f:
             return set(line.strip() for line in f if line.strip())
@@ -103,7 +107,7 @@ def aggregate_logs(mkdir=False):
             TMP_LOG_PATH.mkdir(exist_ok=True)
         return
     for prefix in LOG_PREFIXES.values():
-        log_files = list(TMP_LOG_PATH.glob(f"{prefix}_*.txt"))
+        log_files = list(TMP_LOG_PATH.glob(f"{prefix}_*.{get_suffix_func(prefix)}"))
         if not log_files:
             continue
 
@@ -115,7 +119,7 @@ def aggregate_logs(mkdir=False):
             except Exception as err:
                 print(f"Error reading {file_path}: {err}", flush=True)
 
-        aggregated_file = TEST_LOG_PATH / f"{prefix}.txt"
+        aggregated_file = TEST_LOG_PATH / f"{prefix}.{get_suffix_func(prefix)}"
         try:
             with aggregated_file.open("a") as f:
                 f.writelines(f"{line}\n" for line in sorted(all_lines))
@@ -136,7 +140,7 @@ def print_log_info(all_case, fail_case):
     recorded_count = 0
 
     for log_type, prefix in LOG_PREFIXES.items():
-        log_file = TEST_LOG_PATH / f"{prefix}.txt"
+        log_file = TEST_LOG_PATH / f"{prefix}.{get_suffix_func(prefix)}"
         if not log_file.exists():
             continue
         try:
